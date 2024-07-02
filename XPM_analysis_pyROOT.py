@@ -13,6 +13,7 @@ version = sys.version_info.major
 #hardcoded stuff
 #path = 'C:/Users/exouser/Desktop/xpm_fitter_data/'    
 #path = './'    
+#path = '/mnt/c/Users/exouser/Desktop/xpm_fitter_data/'    
 path = '/mnt/c/Users/exouser/Desktop/xpm_fitter_data/'    
 
 tree = ROOT.TTree('xpmdata','')
