@@ -15,6 +15,7 @@ version = sys.version_info.major
 #path = './'    
 #path = '/mnt/c/Users/exouser/Desktop/xpm_fitter_data/'    
 path = '/mnt/c/Users/exouser/Desktop/xpm_fitter_data/'    
+global tree
 
 tree = ROOT.TTree('xpmdata','')
 myhist = ROOT.TH2F()
@@ -117,8 +118,22 @@ while(1):
     sel = str(myinput('---- ')) 
     if sel == str(1):
         #plt.clf()
+        ROOT.gErrorIgnoreLevel = 6001
         tree.Reset()
-        tree.ReadFile(path+file_name+'.txt','Tc:Ta:TcRise:TaRise:cat:an:offst:datime:IR:UV:chi2:nAvg:nTrig',',')
+        try :
+            tree.ReadFile(path+file_name+'.txt','Tc:Ta:TcRise:TaRise:cat:an:offst:datime:IR:UV:chi2:nAvg:nTrig:cat_ll:cat_ul:an_ll:an_ul',',')
+            tree.Draw('Entry$:datime','','goff')
+            entry0 = tree.GetV1()[0]
+        except ReferenceError :
+            try :
+                tree = ROOT.TTree('xpmdata','')
+                tree.ReadFile(path+file_name+'.txt','Tc:Ta:TcRise:TaRise:cat:an:offst:datime:IR:UV:chi2:nAvg:nTrig',',')
+                tree.Draw('Entry$:datime','','goff')
+                entry0 = tree.GetV1()[0]
+            except ReferenceError :
+                tree = ROOT.TTree('xpmdata','')
+                tree.ReadFile(path+file_name+'.txt','Tc:Ta:TcRise:TaRise:cat:an:offst:datime:IR:UV',',')
+
         tree.Draw('(Tc-Ta)/log(an/cat):datime','','goff')
         lf_time = vtoa( tree.GetV1() , tree.GetSelectedRows() - 1 )
         t0 = tree.GetV2()[0]
@@ -165,30 +180,64 @@ while(1):
         else :
             nbinsX = int( tree.GetEntries()/avg_samples )
             myhist=ROOT.TH2F('myhist','',nbinsX,0.0,(t1-t0)/3600.0,int(maxtau/100.0),0.0,maxtau)
-        
+         
         tree.Draw('(Tc-Ta)/log(an/cat):(datime-'+str(t0)+')/3600.0','','goff')
         norm_time_clean = vtoa( tree.GetV2() , tree.GetSelectedRows() - 1 )
         #myhist=ROOT.TH2F()
         #maxtau = 50000.0
         com = '(Tc-Ta)/log(an/cat):(datime-'+str(t0)+')/3600.0>>myhist'
         mindiff = float(str(myinput('Minimum cathode-anode difference [mV]: ')))
-        tcut = 'UV>30 && cat>0 && an>0 && an<(cat-'+str(mindiff)+')'
+        tcut_base = 'UV>30 && cat>0 && an>0 && an<(cat-'+str(mindiff)+')'
+        tcut = tcut_base
+        myhist_el = myhist
+        myhist_eh = myhist
         print(tree.Draw(com,tcut,'goff'))
-        #if bin_by_fibersave :
-        #    myhist.Rebin(int(avg_samples/10.0))
         myprof = myhist.ProfileX()
-        myprof.SetMarkerStyle(20)
-        #myprof.Draw('e')
+        myprof_noweights = myprof
+        if tree.GetNbranches() > 13 : #point-by-point statistical errors have been computed 
+            tcut = '(' + tcut_base + ')*TMath::Power(1.0/((Ta-Tc)/log(cat_ll/an_ul) - (Ta-Tc)/log(cat_ul/an_ll)),2)' 
+            print(tree.Draw(com,tcut,'goff'))
+            myhist_el=ROOT.TH2F('myhist_el','',nbinsX,0.0,(t1-t0)/3600.0,int(100.0),0.0,30.0)
+            myhist_eh=ROOT.TH2F('myhist_eh','',nbinsX,0.0,(t1-t0)/3600.0,int(100.0),0.0,30.0)
+            print(tree.Draw(com,tcut_base,'goff'))
+            myprof_noweights = myhist.ProfileX()
+
         x = []
         y = []
         e = []
         ex = []
         for bin in range(1,myprof.GetNbinsX()+1) :
-            if( myprof.GetBinEntries(bin)<=1 ): continue
+            if( myprof_noweights.GetBinEntries(bin)<=1 ): continue
             x.append(myprof.GetBinCenter(bin))
             y.append(myprof.GetBinContent(bin))
             e.append(myprof.GetBinError(bin))
             ex.append(myprof.GetBinWidth(bin)/2.0)
+            if tree.GetNbranches() > 13 : #point-by-point statistical errors have been computed 
+                eh_cut = ROOT.TCut('(fabs( (datime-'+str(t0)+')/3600.0 - ' + str(x[-1]) + ') <= ' + str(myprof.GetBinWidth(bin)/2.0) + ')')
+                eh_cut = eh_cut and ROOT.TCut('(Ta-Tc)/log(cat/an) < ' + str(y[-1]))
+                eh_cut = eh_cut and ROOT.TCut( tcut_base )
+                eh_cut = eh_cut * ROOT.TCut('TMath::Power(1.0/((Ta-Tc)/log(cat_ll/an_ul) - (Ta-Tc)/log(cat/an)),2)') 
+                com_eh = str(y[-1]) + '- (Ta-Tc)/log(cat/an)' 
+                com_eh = com_eh + ':(datime-'+str(t0)+')/3600.0>>myhist_eh'
+                tree.Draw(com_eh,eh_cut,'goff')
+                prof_eh = myhist_eh.ProfileX()
+                variance = myhist_eh.ProjectionY().GetRMS()**2
+                mean = prof_eh.GetBinContent(bin)
+                ehy.append( np.sqrt( mean**2 + variance ) )
+    
+                el_cut = ROOT.TCut('(fabs( (datime-'+str(t0)+')/3600.0 - ' + str(x[-1]) + ') <= ' + str(myprof.GetBinWidth(bin)/2.0) + ')')
+                el_cut = el_cut and ROOT.TCut('(Ta-Tc)/log(cat/an) > ' + str(y[-1]))
+                el_cut = el_cut and ROOT.TCut( tcut_base )
+                el_cut = el_cut * ROOT.TCut('TMath::Power(1.0/((Ta-Tc)/log(cat/an) - (Ta-Tc)/log(cat_ul/an_ll)),2)') 
+                print(el_cut.GetTitle())
+                com_el = '(Ta-Tc)/log(cat/an) - ' + str(y[-1]) 
+                com_el = com_el + ':(datime-'+str(t0)+')/3600.0>>myhist_el'
+                tree.Draw(com_el,el_cut,'goff')
+                prof_el = myhist_el.ProfileX()
+                variance = myhist_el.ProjectionY().GetRMS()**2
+                mean = prof_el.GetBinContent(bin)
+                ely.append( np.sqrt( mean**2 + variance ) )
+
         
         fitfunc = myinput( 'Fitting function: exponential+baseline or rational (E/R)?' )
         
@@ -228,7 +277,7 @@ while(1):
         #lf_time = (raw_input_file_clean[:,1]-raw_input_file_clean[:,0])/np.log(raw_input_file_clean[:,4]/raw_input_file_clean[:,5])
         avg,err = smooth(lf_time,avg_samples)
         llsel = str(myinput('1 - Average only\n2 - Scatter points only\n3 - Scatter+Average\n4 - Median (lognormal)\n5 - Mode\n'))
-        if llsel == str(1):
+        if llsel == str(1): #1 - Average only
             plt.close()
             the_table = plt.table(cellText=table_vals,
                                   rowLabels=row_labels,
@@ -238,13 +287,19 @@ while(1):
                                   loc='upper right')
             #plt.title(tcut+' ; '+ str(avg_samples)+' samples/bin')
             plt.title(tcut+'\n'+ str(np.around(myprof.GetEntries()/myprof.GetNbinsX(),1))+' post-cut samples/bin')
-            plt.errorbar(x,y,e,ex,fmt='ro')
+            
+            if tree.GetNbranches() > 13 : #point-by-point statistical errors have been computed 
+                errormatrix=np.array([np.array(ely),np.array(ehy)])
+                plt.errorbar(x,y,xerr=ex,yerr=errormatrix,fmt='r.')
+            else :
+                plt.errorbar(x,y,e,ex,fmt='ro')
+            
             plt.plot(xfit,yfit,'b-')
             plt.xlabel('Hours')
             plt.annotate('Average', xy=(0.1, 0.95), xycoords='axes fraction',color='red',weight='bold')
             plt.ylabel('e$^{-}$ lifetime [$\mu$s]')
             #plt.show(block=False)
-        elif llsel == str(2):
+        elif llsel == str(2): #2 - Scatter points only
             tree.Draw(com,tcut,'goff')
             cut_time = vtoa( tree.GetV2() , tree.GetSelectedRows() - 1 )
             cut_tau = vtoa( tree.GetV1() , tree.GetSelectedRows() - 1 )
@@ -255,7 +310,7 @@ while(1):
             plt.ylabel('e$^{-}$ lifetime [$\mu$s]')
             plt.annotate('Scatter plot only', xy=(0.1, 0.95), xycoords='axes fraction',color='red',weight='bold')
             #plt.show(block=False)
-        elif llsel == str(3):
+        elif llsel == str(3):#3 - Scatter+Average
             plt.close()
             the_table = plt.table(cellText=table_vals,
                                   rowLabels=row_labels,
@@ -279,7 +334,7 @@ while(1):
             plt.ylabel('e$^{-}$ lifetime [$\mu$s]')
             plt.annotate('Average', xy=(0.1, 0.95), xycoords='axes fraction',color='red',weight='bold')
             plt.show(block=False)
-        elif llsel == str(4):
+        elif llsel == str(4):#4 - Median (lognormal)
             plt.close()
             tree.Draw('log((Tc-Ta)/log(an/cat)):datime','','goff')
             t0 = tree.GetV2()[0]
@@ -348,7 +403,7 @@ while(1):
             if time_choice == 'hour': plt.xlabel('Hours') 
             plt.annotate('Median (assumes lognormality)', xy=(0.1, 0.95), xycoords='axes fraction',color='red',weight='bold')
             plt.ylabel('e$^{-}$ lifetime [$\mu$s]')
-        elif llsel == str(5):
+        elif llsel == str(5):#5 - Mode
             plt.close()
             tree.Draw('log((Tc-Ta)/log(an/cat)):datime','','goff')
             myhist=ROOT.TH2F()
@@ -461,7 +516,21 @@ while(1):
         print('hello')
         plt.close()
         tree.Reset()
-        tree.ReadFile(path+file_name+'.txt','Tc:Ta:TcRise:TaRise:cat:an:offst:datime:IR:UV:chi2:nAvg:nTrig',',')
+        #tree.ReadFile(path+file_name+'.txt','Tc:Ta:TcRise:TaRise:cat:an:offst:datime:IR:UV:chi2:nAvg:nTrig',',')
+        try :
+            tree.ReadFile(path+file_name+'.txt','Tc:Ta:TcRise:TaRise:cat:an:offst:datime:IR:UV:chi2:nAvg:nTrig:cat_ll:cat_ul:an_ll:an_ul',',')
+            tree.Draw('Entry$:datime','','goff')
+            entry0 = tree.GetV1()[0]
+        except ReferenceError :
+            try :
+                tree = ROOT.TTree('xpmdata','')
+                tree.ReadFile(path+file_name+'.txt','Tc:Ta:TcRise:TaRise:cat:an:offst:datime:IR:UV:chi2:nAvg:nTrig',',')
+                tree.Draw('Entry$:datime','','goff')
+                entry0 = tree.GetV1()[0]
+            except ReferenceError :
+                tree = ROOT.TTree('xpmdata','')
+                tree.ReadFile(path+file_name+'.txt','Tc:Ta:TcRise:TaRise:cat:an:offst:datime:IR:UV',',')
+
         tree.Draw('UV:cat','cat>0','goff')
         cat_sig = vtoa( tree.GetV2() , tree.GetSelectedRows() - 1 )
         uv_sig = vtoa( tree.GetV1() , tree.GetSelectedRows() - 1 )
