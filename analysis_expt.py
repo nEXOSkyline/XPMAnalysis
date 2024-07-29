@@ -149,7 +149,7 @@ class xpm_analysis(tk.Frame):
             fexp.SetParameters(myprof.GetBinContent(1)*2,2.0,0.005) 
             row_labels=['$\chi^2$/ndf','A','B','C']
         try :
-          mi,ma = str(self.fitdomain).split()
+          mi,ma = str(self.fd.get()).split()
           fexp.SetRange(float(mi),float(ma))
           myprof.Fit(fexp,'NRE')
         except ValueError:
@@ -397,66 +397,67 @@ class xpm_analysis(tk.Frame):
         # next two lines are for the texbox for entries
         self.dataFileInput = tk.Text( height=2, width=72) # text box( where user enters path)
         self.dataFileInput.insert(tk.END,os.getcwd() + os.sep + 'xpm_fitter_data' + os.sep + 'testData')
-        self.dataFileInput.grid( row=2, column=0, columnspan=4,sticky=tk.W)
+        self.dataFileInput.pack(side=tk.TOP)
 
         self.analysis_option = tk.StringVar(master=self.parent)
         self.analysis_option.set('1 e- lifetime trend')
         self.analysis_pd_menu = tk.OptionMenu(self.parent,self.analysis_option,'1 e- lifetime trend','2 Cathode/Anode Trend','3 Power Monitors trend','4 Purity vs Cathode','5 Purity vs Power Monitors' )
-        self.analysis_pd_menu.grid(row=3, column=0,columnspan=3,sticky=tk.W)
+        self.analysis_pd_menu.pack(side=tk.BOTTOM)
         
         self.plotting_option = tk.StringVar(master=self.parent)
         self.plotting_option.set('3 Scatter+Average')
         self.plotting_pd_menu = tk.OptionMenu(self.parent,self.plotting_option,'1 Average only','2 Scatter points only','3 Scatter+Average','4 Median (lognormal)','5 Mode')
-        self.plotting_pd_menu.grid(row=4, column=0,columnspan=3,sticky=tk.W)
+        self.plotting_pd_menu.pack(side=tk.BOTTOM)
         
         self.opbLabel = tk.Label(height=1,width=30)
         self.opbLabel.config(text='Number of Samples to Average:')
-        self.opbLabel.grid(row=5,column=0,sticky=tk.E)
+        self.opbLabel.pack(side=tk.BOTTOM)
         self.obsPerBin = tk.StringVar(self.parent)
         self.obsPerBin.set('10.0')  ### 33.0
         self.opb = tk.Spinbox(self.parent, increment=1.0, foreground='black', background='white', from_ = 1.0 , to = 1000000000.0 , width=24, textvariable = self.obsPerBin)
-        self.opb.grid(row=5, column=1, sticky=tk.W)
+        self.opb.pack(side=tk.LEFT)
         
         self.mdLabel = tk.Label(height=1,width=30)
         self.mdLabel.config(text='Minimum cathode-anode difference [mV]:')
-        self.mdLabel.grid(row=6,column=0,sticky=tk.E)
+        self.mdLabel.pack(side = tk.BOTTOM)
         self.minacdiff = tk.StringVar(self.parent)
         self.minacdiff.set('0.2')  ### 33.0
         self.mdSpinBox = tk.Spinbox(self.parent, increment=0.01, foreground='black', background='white', from_ = 0.0 , to = 1000.0 , width=24, textvariable = self.minacdiff)
-        self.mdSpinBox.grid(row=6, column=1, sticky=tk.W)
+        self.mdSpinBox.pack(side = tk.LEFT)
 
         self.binbyfibersave = tk.IntVar(value=0)
         self.bbfscheck = tk.Checkbutton( text='Bin by Fiber-save group?', variable = self.binbyfibersave, onvalue=1, offvalue=0 )
-        self.bbfscheck.grid(row=7,column=0,sticky=tk.W)
+        self.bbfscheck.pack(side = tk.BOTTOM)
 
         self.isrational = tk.IntVar(value=0)
         self.ircheck = tk.Checkbutton( text='Use rational function?', variable = self.isrational, onvalue=1, offvalue=0 )
-        self.ircheck.grid(row=8,column=0,sticky=tk.W)
+        self.ircheck.pack(side = tk.BOTTOM)
 
         self.superimpose = tk.IntVar(value=1)
         self.sicheck = tk.Checkbutton( text='Superimpose scatterplot?', variable = self.superimpose, onvalue=1, offvalue=0 )
-        self.ircheck.grid(row=9,column=0,sticky=tk.W)
+        self.sicheck.pack(side=tk.BOTTOM)
 
         self.fdLabel = tk.Label(height=1,width=30,font=('Arial',14))
         self.fdLabel.config(text='Time axis domain')
-        self.fdLabel.grid(row=10,column=0,sticky=tk.E)
+        self.fdLabel.pack(side=tk.BOTTOM)
         self.fitdomain = tk.StringVar(self.parent)
         self.fitdomain.set(' ')  ### 33.0
-        self.fd = tk.Entry(self.parent, font=('Arial',14),foreground='black', background='white', height=1,width=24,variable=self.fitdomain)
-        self.fd.grid(row=10, column=1, sticky=tk.W)
+        self.fd = tk.Entry(self.parent, font=('Arial',14),foreground='black', background='white', width=24)
+        self.fd.pack(side=tk.LEFT)
         
         self.figure1 = Figure(figsize=(5, 4), dpi=100)
         self.canvas1 = FigureCanvasTkAgg(self.figure1, master=self.parent)
         self.plot_widget1 = self.canvas1.get_tk_widget()
-        self.plot_widget1.grid(row=3, rowspan=7, column=2, columnspan=8)
+        self.plot_widget1.pack(side=tk.LEFT)
         self.plt1 = self.figure1.add_subplot(111)
         plt.ion()
-        self.toolbar = NavigationToolbar2Tk(self.canvas1, self.master, pack_toolbar=False )
+        self.toolbar = NavigationToolbar2Tk(self.canvas1, self.master )
+        self.toolbar.pack_forget()
         self.toolbar.update()
-        self.toolbar.grid(row=11, column=2)
+        self.toolbar.pack(side=tk.BOTTOM)
         self.canvas1.draw_idle()
 
         self.gobutton = tk.Button(text='Execute', command=self.do_it)
-        self.gobutton.grid( row=12, column=1 )
+        self.gobutton.pack( side=tk.BOTTOM )
 
 
