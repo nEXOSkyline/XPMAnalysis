@@ -14,11 +14,12 @@ import os
 from pathlib import WindowsPath, Path
 from datetime import datetime
 from decimal import Decimal
-import ROOT
+#import ROOT
 
 class xpm_analysis(tk.Frame):
     def elifetimetrend(self) :
-        #plt.clf()
+        print(self)
+        '''
         ROOT.gErrorIgnoreLevel = 6001
         self.tree.Reset()
         try :
@@ -376,7 +377,7 @@ class xpm_analysis(tk.Frame):
             if time_choice == 'day': plt.xticks(rotation=25)
             if time_choice == 'hour': plt.xlabel('Hours') 
             plt.ylabel('e$^{-}$ lifetime [$\mu$s]')
-
+        '''
     def do_it(self) :
         print(self.analysis_option.get())
 
@@ -389,74 +390,74 @@ class xpm_analysis(tk.Frame):
     def __init__(self, parent):
         tk.Frame.__init__(self, parent)
         self.parent = parent
-        self.tree = ROOT.TTree('xpmdata','')
-        self.myhist = ROOT.TH2F()
-        self.myhist.SetName('myhist')
+        #self.tree = ROOT.TTree('xpmdata','')
+        #self.myhist = ROOT.TH2F()
+        #self.myhist.SetName('myhist')
 
+        self.figure1 = Figure(figsize=(5, 4), dpi=100)
+        self.canvas1 = FigureCanvasTkAgg(self.figure1, master=self.parent)
+        self.plot_widget1 = self.canvas1.get_tk_widget()
+        self.plot_widget1.pack(side=tk.RIGHT)
+        self.plt1 = self.figure1.add_subplot(111)
 
-        # next two lines are for the texbox for entries
         self.dataFileInput = tk.Text( height=2, width=72) # text box( where user enters path)
         self.dataFileInput.insert(tk.END,os.getcwd() + os.sep + 'xpm_fitter_data' + os.sep + 'testData')
         self.dataFileInput.pack(side=tk.TOP)
 
+
         self.analysis_option = tk.StringVar(master=self.parent)
         self.analysis_option.set('1 e- lifetime trend')
         self.analysis_pd_menu = tk.OptionMenu(self.parent,self.analysis_option,'1 e- lifetime trend','2 Cathode/Anode Trend','3 Power Monitors trend','4 Purity vs Cathode','5 Purity vs Power Monitors' )
-        self.analysis_pd_menu.pack(side=tk.BOTTOM)
+        self.analysis_pd_menu.pack(side=tk.TOP)
         
         self.plotting_option = tk.StringVar(master=self.parent)
         self.plotting_option.set('3 Scatter+Average')
         self.plotting_pd_menu = tk.OptionMenu(self.parent,self.plotting_option,'1 Average only','2 Scatter points only','3 Scatter+Average','4 Median (lognormal)','5 Mode')
-        self.plotting_pd_menu.pack(side=tk.BOTTOM)
+        self.plotting_pd_menu.pack(side=tk.TOP)
+        
         
         self.opbLabel = tk.Label(height=1,width=30)
         self.opbLabel.config(text='Number of Samples to Average:')
-        self.opbLabel.pack(side=tk.BOTTOM)
+        self.opbLabel.pack(side=tk.TOP)
         self.obsPerBin = tk.StringVar(self.parent)
         self.obsPerBin.set('10.0')  ### 33.0
         self.opb = tk.Spinbox(self.parent, increment=1.0, foreground='black', background='white', from_ = 1.0 , to = 1000000000.0 , width=24, textvariable = self.obsPerBin)
-        self.opb.pack(side=tk.LEFT)
-        
+        self.opb.pack(side=tk.TOP)
+
         self.mdLabel = tk.Label(height=1,width=30)
         self.mdLabel.config(text='Minimum cathode-anode difference [mV]:')
-        self.mdLabel.pack(side = tk.BOTTOM)
+        self.mdLabel.pack(side = tk.TOP)
         self.minacdiff = tk.StringVar(self.parent)
         self.minacdiff.set('0.2')  ### 33.0
         self.mdSpinBox = tk.Spinbox(self.parent, increment=0.01, foreground='black', background='white', from_ = 0.0 , to = 1000.0 , width=24, textvariable = self.minacdiff)
-        self.mdSpinBox.pack(side = tk.LEFT)
+        self.mdSpinBox.pack(side = tk.TOP)
 
         self.binbyfibersave = tk.IntVar(value=0)
         self.bbfscheck = tk.Checkbutton( text='Bin by Fiber-save group?', variable = self.binbyfibersave, onvalue=1, offvalue=0 )
-        self.bbfscheck.pack(side = tk.BOTTOM)
+        self.bbfscheck.pack(side = tk.TOP)
 
         self.isrational = tk.IntVar(value=0)
         self.ircheck = tk.Checkbutton( text='Use rational function?', variable = self.isrational, onvalue=1, offvalue=0 )
-        self.ircheck.pack(side = tk.BOTTOM)
+        self.ircheck.pack(side = tk.TOP)
 
         self.superimpose = tk.IntVar(value=1)
         self.sicheck = tk.Checkbutton( text='Superimpose scatterplot?', variable = self.superimpose, onvalue=1, offvalue=0 )
-        self.sicheck.pack(side=tk.BOTTOM)
+        self.sicheck.pack(side=tk.TOP)
 
         self.fdLabel = tk.Label(height=1,width=30,font=('Arial',14))
         self.fdLabel.config(text='Time axis domain')
-        self.fdLabel.pack(side=tk.BOTTOM)
+        self.fdLabel.pack(side=tk.TOP)
         self.fitdomain = tk.StringVar(self.parent)
         self.fitdomain.set(' ')  ### 33.0
         self.fd = tk.Entry(self.parent, font=('Arial',14),foreground='black', background='white', width=24)
-        self.fd.pack(side=tk.LEFT)
-        
-        self.figure1 = Figure(figsize=(5, 4), dpi=100)
-        self.canvas1 = FigureCanvasTkAgg(self.figure1, master=self.parent)
-        self.plot_widget1 = self.canvas1.get_tk_widget()
-        self.plot_widget1.pack(side=tk.LEFT)
-        self.plt1 = self.figure1.add_subplot(111)
+        self.fd.pack(side=tk.TOP)
+
         plt.ion()
         self.toolbar = NavigationToolbar2Tk(self.canvas1, self.master )
-        self.toolbar.pack_forget()
         self.toolbar.update()
         self.toolbar.pack(side=tk.BOTTOM)
         self.canvas1.draw_idle()
-
+        
         self.gobutton = tk.Button(text='Execute', command=self.do_it)
         self.gobutton.pack( side=tk.BOTTOM )
 
