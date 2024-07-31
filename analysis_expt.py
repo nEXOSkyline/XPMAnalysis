@@ -14,27 +14,32 @@ import os
 from pathlib import WindowsPath, Path
 from datetime import datetime
 from decimal import Decimal
-#import ROOT
+import ROOT
+
+
+def vtoa( buf, entries ):
+  retarr = []
+  for idx in range(0,entries-1) :
+    retarr.append( buf[idx] )
+  return retarr
 
 class xpm_analysis(tk.Frame):
     def elifetimetrend(self) :
-        print(self)
-        '''
         ROOT.gErrorIgnoreLevel = 6001
         self.tree.Reset()
         try :
-            self.tree.ReadFile(path+file_name+'.txt','Tc:Ta:TcRise:TaRise:cat:an:offst:datime:IR:UV:chi2:nAvg:nTrig:cat_ll:cat_ul:an_ll:an_ul',',')
+            self.tree.ReadFile(self.dataFileInput.get(),'Tc:Ta:TcRise:TaRise:cat:an:offst:datime:IR:UV:chi2:nAvg:nTrig:cat_ll:cat_ul:an_ll:an_ul',',')
             self.tree.Draw('Entry$:datime','','goff')
             entry0 = self.tree.GetV1()[0]
         except ReferenceError :
             try :
                 self.tree = ROOT.TTree('xpmdata','')
-                self.tree.ReadFile(path+file_name+'.txt','Tc:Ta:TcRise:TaRise:cat:an:offst:datime:IR:UV:chi2:nAvg:nTrig',',')
+                self.tree.ReadFile(self.dataFileInput.get(),'Tc:Ta:TcRise:TaRise:cat:an:offst:datime:IR:UV:chi2:nAvg:nTrig',',')
                 self.tree.Draw('Entry$:datime','','goff')
                 entry0 = self.tree.GetV1()[0]
             except ReferenceError :
                 self.tree = ROOT.TTree('xpmdata','')
-                self.tree.ReadFile(path+file_name+'.txt','Tc:Ta:TcRise:TaRise:cat:an:offst:datime:IR:UV',',')
+                self.tree.ReadFile(self.dataFileInput.get(),'Tc:Ta:TcRise:TaRise:cat:an:offst:datime:IR:UV',',')
 
         self.tree.Draw('(Tc-Ta)/log(an/cat):datime','','goff')
         lf_time = vtoa( self.tree.GetV1() , self.tree.GetSelectedRows() - 1 )
@@ -138,11 +143,11 @@ class xpm_analysis(tk.Frame):
                 mean = prof_el.GetBinContent(bin)
                 ely.append( np.sqrt( mean**2 + variance ) )
 
-        if self.isrational == 0 :
+        if self.isrational.get() == 0 :
             fitfunc = 'E'
         else :
             fitfunc = 'R'
-        
+        print(self.fd.get())
         fexp = ROOT.TF1('fexp','expo + [2]',x[0],x[-1])
         row_labels=['$\chi^2$/ndf','Constant','Slope','Baseline']
         if fitfunc=='R' :
@@ -150,7 +155,8 @@ class xpm_analysis(tk.Frame):
             fexp.SetParameters(myprof.GetBinContent(1)*2,2.0,0.005) 
             row_labels=['$\chi^2$/ndf','A','B','C']
         try :
-          mi,ma = str(self.fd.get()).split()
+          mi,ma = self.fd.get().split()
+          print(self.fd.get())
           fexp.SetRange(float(mi),float(ma))
           myprof.Fit(fexp,'NRE')
         except ValueError:
@@ -173,71 +179,83 @@ class xpm_analysis(tk.Frame):
                     ['{0:.3g}'.format(fexp.GetParameter(1))+'$\pm$'+'{0:.3g}'.format(fexp.GetParError(1))],
                     ['{0:.3g}'.format(fexp.GetParameter(2))+'$\pm$'+'{0:.3g}'.format(fexp.GetParError(2))]]
         # the rectangle is where I want to place the table
-        #plt.show()
+        #self.plt1.show()
         ########
         subsample_norm_time = norm_time_clean[::avg_samples]
         #lf_time = (raw_input_file_clean[:,1]-raw_input_file_clean[:,0])/np.log(raw_input_file_clean[:,4]/raw_input_file_clean[:,5])
-        avg,err = smooth(lf_time,avg_samples)
+        #avg,err = smooth(lf_time,avg_samples)
         llsel = self.plotting_option.get()[0] 
         if llsel == str(1): #1 - Average only
-            plt.close()
-            the_table = plt.table(cellText=table_vals,
+            self.figure1.clf()
+            self.plt1 = self.figure1.add_subplot(111)
+            self.plt1.yaxis.get_major_formatter().set_powerlimits((3,3))
+            the_table = self.plt1.table(cellText=table_vals,
                                   rowLabels=row_labels,
                                   colLabels=col_labels,
                                   fontsize=8,
                                   colWidths=[0.3]*3,
                                   loc='upper right')
-            #plt.title(tcut+' ; '+ str(avg_samples)+' samples/bin')
-            plt.title(tcut+'\n'+ str(np.around(myprof.GetEntries()/myprof.GetNbinsX(),1))+' post-cut samples/bin')
+            #self.plt1.title(tcut+' ; '+ str(avg_samples)+' samples/bin')
+            self.plt1.title.set_text(tcut+'\n'+ str(np.around(myprof.GetEntries()/myprof.GetNbinsX(),1))+' post-cut samples/bin')
             
             if self.tree.GetNbranches() > 13 : #point-by-point statistical errors have been computed 
                 errormatrix=np.array([np.array(ely),np.array(ehy)])
-                plt.errorbar(x,y,xerr=ex,yerr=errormatrix,fmt='r.')
+                self.plt1.errorbar(x,y,xerr=ex,yerr=errormatrix,fmt='r.')
             else :
-                plt.errorbar(x,y,e,ex,fmt='ro')
+                self.plt1.errorbar(x,y,e,ex,fmt='ro')
             
-            plt.plot(xfit,yfit,'b-')
-            plt.xlabel('Hours')
-            plt.annotate('Average', xy=(0.1, 0.95), xycoords='axes fraction',color='red',weight='bold')
-            plt.ylabel('e$^{-}$ lifetime [$\mu$s]')
-            #plt.show(block=False)
+            self.plt1.plot(xfit,yfit,'b-')
+            self.plt1.set_xlabel('Hours')
+            self.plt1.annotate('Average', xy=(0.1, 0.95), xycoords='axes fraction',color='red',weight='bold')
+            self.plt1.set_ylabel('e$^{-}$ lifetime [$\mu$s]')
+            #self.plt1.show(block=False)
+            self.canvas1.draw_idle()
         elif llsel == str(2): #2 - Scatter points only
+            self.figure1.clf()
+            self.plt1 = self.figure1.add_subplot(111)
+            self.plt1.yaxis.get_major_formatter().set_powerlimits((3,3))
             self.tree.Draw(com,tcut,'goff')
             cut_time = vtoa( self.tree.GetV2() , self.tree.GetSelectedRows() - 1 )
             cut_tau = vtoa( self.tree.GetV1() , self.tree.GetSelectedRows() - 1 )
-            plt.close()
-            plt.plot(norm_time_clean,lf_time,'go',markersize=1.5,zorder=-32)           
-            plt.plot(cut_time,cut_tau,'m^',markersize=1.5,zorder=-32)           
-            plt.xlabel('Hours')
-            plt.ylabel('e$^{-}$ lifetime [$\mu$s]')
-            plt.annotate('Scatter plot only', xy=(0.1, 0.95), xycoords='axes fraction',color='red',weight='bold')
-            #plt.show(block=False)
+            #self.plt1.close()
+            self.plt1.plot(norm_time_clean,lf_time,'go',markersize=1.5,zorder=-32)           
+            self.plt1.plot(cut_time,cut_tau,'m^',markersize=1.5,zorder=-32)           
+            self.plt1.set_xlabel('Hours')
+            self.plt1.set_ylabel('e$^{-}$ lifetime [$\mu$s]')
+            self.plt1.annotate('Scatter plot only', xy=(0.1, 0.95), xycoords='axes fraction',color='red',weight='bold')
+            self.canvas1.draw_idle()
+            #self.plt1.show(block=False)
         elif llsel == str(3):#3 - Scatter+Average
-            plt.close()
-            the_table = plt.table(cellText=table_vals,
+            self.figure1.clf()
+            self.plt1 = self.figure1.add_subplot(111)
+            self.plt1.yaxis.get_major_formatter().set_powerlimits((3,3))
+            the_table = self.plt1.table(cellText=table_vals,
                                   rowLabels=row_labels,
                                   colLabels=col_labels,
                                   fontsize=8,
                                   colWidths=[0.3]*3,
                                   loc='upper right')
-            #plt.title(tcut+' ; '+ str(avg_samples)+' samples/bin')
-            plt.title(tcut+'\n'+ str(np.around(myprof.GetEntries()/myprof.GetNbinsX(),1))+' post-cut samples/bin')
-            plt.errorbar(x,y,e,ex,fmt='ro')
-            plt.plot(xfit,yfit,'b-')
+            #self.plt1.title(tcut+' ; '+ str(avg_samples)+' samples/bin')
+            self.plt1.title.set_text(tcut+'\n'+ str(np.around(myprof.GetEntries()/myprof.GetNbinsX(),1))+' post-cut samples/bin')
+            self.plt1.errorbar(x,y,e,ex,fmt='ro')
+            self.plt1.plot(xfit,yfit,'b-')
             self.tree.Draw(com,tcut,'goff')
             cut_time = vtoa( self.tree.GetV2() , self.tree.GetSelectedRows() - 1 )
             cut_tau = vtoa( self.tree.GetV1() , self.tree.GetSelectedRows() - 1 )
-            plt.plot(norm_time_clean,lf_time,'go',markersize=1.5,zorder=-32)           
-            plt.plot(cut_time,cut_tau,'m^',markersize=1.5,zorder=-32)           
-            #plt.errorbar(subsample_norm_time,avg,yerr=err/np.sqrt(avg_samples-1),fmt='ro')
-            #plt.title('Raw Lifetime and Lifetime Averaged Over %i Samples'%avg_samples)
-            if time_choice == 'day': plt.xticks(rotation=25)
-            if time_choice == 'hour': plt.xlabel('Hours') 
-            plt.ylabel('e$^{-}$ lifetime [$\mu$s]')
-            plt.annotate('Average', xy=(0.1, 0.95), xycoords='axes fraction',color='red',weight='bold')
-            plt.show(block=False)
+            self.plt1.plot(norm_time_clean,lf_time,'go',markersize=1.5,zorder=-32)           
+            self.plt1.plot(cut_time,cut_tau,'m^',markersize=1.5,zorder=-32)           
+            #self.plt1.errorbar(subsample_norm_time,avg,yerr=err/np.sqrt(avg_samples-1),fmt='ro')
+            #self.plt1.title('Raw Lifetime and Lifetime Averaged Over %i Samples'%avg_samples)
+            #if time_choice == 'day': self.plt1.xticks(rotation=25)
+            self.plt1.set_xlabel('Hours') 
+            self.plt1.set_ylabel('e$^{-}$ lifetime [$\mu$s]')
+            self.plt1.annotate('Average', xy=(0.1, 0.95), xycoords='axes fraction',color='red',weight='bold')
+            #self.plt1.show(block=False)
+            self.canvas1.draw_idle()
         elif llsel == str(4):#4 - Median (lognormal)
-            plt.close()
+            self.figure1.clf()
+            self.plt1 = self.figure1.add_subplot(111)
+            self.plt1.yaxis.get_major_formatter().set_powerlimits((3,3))
             self.tree.Draw('log((Tc-Ta)/log(an/cat)):datime','','goff')
             t0 = self.tree.GetV2()[0]
             t1 = self.tree.GetV2()[self.tree.GetEntries()-1]
@@ -282,31 +300,33 @@ class xpm_analysis(tk.Frame):
                         ['{0:.3g}'.format(fexp.GetParameter(0))+'$\pm$'+'{0:.3g}'.format(fexp.GetParError(0))],
                         ['{0:.3g}'.format(fexp.GetParameter(1))+'$\pm$'+'{0:.3g}'.format(fexp.GetParError(1))],
                         ['{0:.3g}'.format(fexp.GetParameter(2))+'$\pm$'+'{0:.3g}'.format(fexp.GetParError(2))]]
-            the_table = plt.table(cellText=table_vals,
+            the_table = self.plt1.table(cellText=table_vals,
                                   rowLabels=row_labels,
                                   colLabels=col_labels,
                                   fontsize=8,
                                   colWidths=[0.3]*3,
                                   loc='upper right')
-            #plt.title(tcut+' ; '+ str(avg_samples)+' samples/bin')
-            plt.title(tcut+'\n'+ str(np.around(myprof.GetEntries()/myprof.GetNbinsX(),1))+' post-cut samples/bin')
+            #self.plt1.title(tcut+' ; '+ str(avg_samples)+' samples/bin')
+            self.plt1.title.set_text(tcut+'\n'+ str(np.around(myprof.GetEntries()/myprof.GetNbinsX(),1))+' post-cut samples/bin')
             errormatrix=np.array([np.array(ely),np.array(ehy)])
-            plt.errorbar(x,y,xerr=ex,yerr=errormatrix,markersize=4,fmt='ro')
-            plt.plot(xfit,yfit,'b-')
+            self.plt1.errorbar(x,y,xerr=ex,yerr=errormatrix,markersize=4,fmt='ro')
+            self.plt1.plot(xfit,yfit,'b-')
             com = '((Tc-Ta)/log(an/cat)):(datime-'+str(t0)+')/3600.0'
             self.tree.Draw(com,tcut,'goff')
             cut_time = vtoa( self.tree.GetV2() , self.tree.GetSelectedRows() - 1 )
             cut_tau = vtoa( self.tree.GetV1() , self.tree.GetSelectedRows() - 1 )
             ptsel = self.superimpose.get() 
             if ptsel == 1 :
-                plt.plot(norm_time_clean,lf_time,'go',markersize=1.5,zorder=-32)           
-                plt.plot(cut_time,cut_tau,'m^',markersize=1.5,zorder=-32)           
-            if time_choice == 'day': plt.xticks(rotation=25)
-            if time_choice == 'hour': plt.xlabel('Hours') 
-            plt.annotate('Median (assumes lognormality)', xy=(0.1, 0.95), xycoords='axes fraction',color='red',weight='bold')
-            plt.ylabel('e$^{-}$ lifetime [$\mu$s]')
+                self.plt1.plot(norm_time_clean,lf_time,'go',markersize=1.5,zorder=-32)           
+                self.plt1.plot(cut_time,cut_tau,'m^',markersize=1.5,zorder=-32)           
+            self.plt1.set_xlabel('Hours') 
+            self.plt1.annotate('Median (assumes lognormality)', xy=(0.1, 0.95), xycoords='axes fraction',color='red',weight='bold')
+            self.plt1.set_ylabel('e$^{-}$ lifetime [$\mu$s]')
+            self.canvas1.draw_idle()
         elif llsel == str(5):#5 - Mode
-            plt.close()
+            self.figure1.clf()
+            self.plt1 = self.figure1.add_subplot(111)
+            self.plt1.yaxis.get_major_formatter().set_powerlimits((3,3))
             self.tree.Draw('log((Tc-Ta)/log(an/cat)):datime','','goff')
             self.myhist=ROOT.TH2F()
             self.myhist=ROOT.TH2F('myhist','',nbinsX,0.0,(t1-t0)/3600.0,int(75*maxtau/100000.0),0.0,maxtau)
@@ -354,32 +374,35 @@ class xpm_analysis(tk.Frame):
                         ['{0:.3g}'.format(fexp.GetParameter(0))+'$\pm$'+'{0:.3g}'.format(fexp.GetParError(0))],
                         ['{0:.3g}'.format(fexp.GetParameter(1))+'$\pm$'+'{0:.3g}'.format(fexp.GetParError(1))],
                         ['{0:.3g}'.format(fexp.GetParameter(2))+'$\pm$'+'{0:.3g}'.format(fexp.GetParError(2))]]
-            the_table = plt.table(cellText=table_vals,
+            the_table = self.plt1.table(cellText=table_vals,
                                   rowLabels=row_labels,
                                   colLabels=col_labels,
                                   fontsize=8,
                                   colWidths=[0.3]*3,
                                   loc='upper right')
-            #plt.title(tcut+' ; '+ str(avg_samples)+' samples/bin')
-            plt.title(tcut+'\n'+ str(np.around(myprof.GetEntries()/myprof.GetNbinsX(),1))+' post-cut samples/bin')
+            #self.plt1.title(tcut+' ; '+ str(avg_samples)+' samples/bin')
+            self.plt1.title.set_text(tcut+'\n'+ str(np.around(myprof.GetEntries()/myprof.GetNbinsX(),1))+' post-cut samples/bin')
             errormatrix=np.array([np.array(ely),np.array(ehy)])
-            plt.errorbar(x,y,xerr=ex,yerr=errormatrix,markersize=4,fmt='ro')
-            plt.plot(xfit,yfit,'b-')
+            self.plt1.errorbar(x,y,xerr=ex,yerr=errormatrix,markersize=4,fmt='ro')
+            self.plt1.plot(xfit,yfit,'b-')
             com = '((Tc-Ta)/log(an/cat)):(datime-'+str(t0)+')/3600.0'
             self.tree.Draw(com,tcut,'goff')
             cut_time = vtoa( self.tree.GetV2() , self.tree.GetSelectedRows() - 1 )
             cut_tau = vtoa( self.tree.GetV1() , self.tree.GetSelectedRows() - 1 )
-            plt.annotate('Mode', xy=(0.1, 0.95), xycoords='axes fraction',color='red',weight='bold')
+            self.plt1.annotate('Mode', xy=(0.1, 0.95), xycoords='axes fraction',color='red',weight='bold')
             ptsel = self.superimpose.get() 
             if ptsel == 1 :
-                plt.plot(norm_time_clean,lf_time,'go',markersize=1.5,zorder=-32)           
-                plt.plot(cut_time,cut_tau,'m^',markersize=1.5,zorder=-32)           
-            if time_choice == 'day': plt.xticks(rotation=25)
-            if time_choice == 'hour': plt.xlabel('Hours') 
-            plt.ylabel('e$^{-}$ lifetime [$\mu$s]')
-        '''
+                self.plt1.plot(norm_time_clean,lf_time,'go',markersize=1.5,zorder=-32)           
+                self.plt1.plot(cut_time,cut_tau,'m^',markersize=1.5,zorder=-32)           
+            self.plt1.set_xlabel('Hours') 
+            self.plt1.set_ylabel('e$^{-}$ lifetime [$\mu$s]')
+            self.canvas1.draw_idle()
+
     def do_it(self) :
-        print(self.analysis_option.get())
+        selected = self.analysis_option.get()
+        print(selected)
+        if selected[0] == '1' :
+            self.elifetimetrend()
 
     def vtoa( self,buf, entries ):
         retarr = []
@@ -390,18 +413,19 @@ class xpm_analysis(tk.Frame):
     def __init__(self, parent):
         tk.Frame.__init__(self, parent)
         self.parent = parent
-        #self.tree = ROOT.TTree('xpmdata','')
-        #self.myhist = ROOT.TH2F()
-        #self.myhist.SetName('myhist')
+        self.tree = ROOT.TTree('xpmdata','')
+        self.myhist = ROOT.TH2F()
+        self.myhist.SetName('myhist')
 
-        self.figure1 = Figure(figsize=(5, 4), dpi=100)
+        self.figure1 = Figure(figsize=(6, 4), dpi=100)
         self.canvas1 = FigureCanvasTkAgg(self.figure1, master=self.parent)
         self.plot_widget1 = self.canvas1.get_tk_widget()
         self.plot_widget1.pack(side=tk.RIGHT)
         self.plt1 = self.figure1.add_subplot(111)
+        self.plt1.yaxis.get_major_formatter().set_powerlimits((3,3))
 
-        self.dataFileInput = tk.Text( height=2, width=72) # text box( where user enters path)
-        self.dataFileInput.insert(tk.END,os.getcwd() + os.sep + 'xpm_fitter_data' + os.sep + 'testData')
+        self.dataFileInput = tk.Entry(self.parent, font=('Arial',14),foreground='black', background='white', width=72)
+        self.dataFileInput.insert(0,os.getcwd() + os.sep + 'xpm_fitter_data' + os.sep + 'testData')
         self.dataFileInput.pack(side=tk.TOP)
 
 
@@ -424,7 +448,7 @@ class xpm_analysis(tk.Frame):
         self.opb = tk.Spinbox(self.parent, increment=1.0, foreground='black', background='white', from_ = 1.0 , to = 1000000000.0 , width=24, textvariable = self.obsPerBin)
         self.opb.pack(side=tk.TOP)
 
-        self.mdLabel = tk.Label(height=1,width=30)
+        self.mdLabel = tk.Label(height=1,width=32)
         self.mdLabel.config(text='Minimum cathode-anode difference [mV]:')
         self.mdLabel.pack(side = tk.TOP)
         self.minacdiff = tk.StringVar(self.parent)
@@ -444,12 +468,12 @@ class xpm_analysis(tk.Frame):
         self.sicheck = tk.Checkbutton( text='Superimpose scatterplot?', variable = self.superimpose, onvalue=1, offvalue=0 )
         self.sicheck.pack(side=tk.TOP)
 
-        self.fdLabel = tk.Label(height=1,width=30,font=('Arial',14))
-        self.fdLabel.config(text='Time axis domain')
+        self.fdLabel = tk.Label(height=1,width=62,font=('Arial',11))
+        self.fdLabel.config(text='Space-separated fit domain bounds, lower bound first [h]')
         self.fdLabel.pack(side=tk.TOP)
         self.fitdomain = tk.StringVar(self.parent)
         self.fitdomain.set(' ')  ### 33.0
-        self.fd = tk.Entry(self.parent, font=('Arial',14),foreground='black', background='white', width=24)
+        self.fd = tk.Entry(self.parent, font=('Arial',11),foreground='black', background='white', width=24)
         self.fd.pack(side=tk.TOP)
 
         plt.ion()
