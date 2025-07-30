@@ -20,6 +20,7 @@ global tree
 tree = ROOT.TTree('xpmdata','')
 myhist = ROOT.TH2F()
 myhist.SetName('myhist')
+noLaser = len(sys.argv) > 1
 
 def myinput( pt ):
 	v = sys.version_info.major
@@ -155,10 +156,10 @@ while(1):
                     ind = 0
                 dtl = tree.GetV2()[entry] - tree.GetV2()[ind]
                 dtr = tree.GetV2()[entry+1] - tree.GetV2()[entry]
-                if  dtl < 1800.0 :
+                if  dtl < 450.0 :
                     timebucket.append(tree.GetV2()[entry])
-                elif len(timebucket) < avg_samples :
-                    timebucket.append(tree.GetV2()[entry])
+                #elif len(timebucket) < avg_samples :
+                #    timebucket.append(tree.GetV2()[entry])
                 else :
                     try :
                         tlow.append( np.array(timebucket).min()-1.0 )
@@ -188,6 +189,7 @@ while(1):
         com = '(Tc-Ta)/log(an/cat):(datime-'+str(t0)+')/3600.0>>myhist'
         mindiff = float(str(myinput('Minimum cathode-anode difference [mV]: ')))
         tcut_base = 'UV>30 && cat>0 && an>0 && an<(cat-'+str(mindiff)+')'
+        if noLaser : tcut_base = 'cat>0 && an>0 && an<(cat-'+str(mindiff)+')'
         tcut = tcut_base
         myhist_el = myhist
         myhist_eh = myhist
@@ -346,6 +348,7 @@ while(1):
             lnhist=ROOT.TH2F('lnhist','',nbinsX,0.0,(t1-t0)/3600.0,int(np.exp(maxtau)/100.0),0.0,maxtau)
             com = 'log((Tc-Ta)/log(an/cat)):(datime-'+str(t0)+')/3600.0>>lnhist'
             tcut = 'UV>30 && cat>0 && an>0 && an<(cat-'+str(mindiff)+')'
+            if noLaser : tcut = 'cat>0 && an>0 && an<(cat-'+str(mindiff)+')'
             print(tree.Draw(com,tcut,'goff'))
             lnprof = lnhist.ProfileX()
             lnprof.SetMarkerStyle(20)
@@ -489,7 +492,7 @@ while(1):
         plt.plot(norm_time,raw_input_file[:,8],'b+',markersize=2,label='blue: IR')
         plt.plot(norm_time,raw_input_file[:,9],'m+',markersize=2,label='red: UV')
         plt.legend()
-        plt.ylim(0,1000)
+        plt.ylim(0,2000)
         if time_choice == 'day': plt.xticks(rotation=25)
         if time_choice == 'hour': plt.xlabel('Hours')
         plt.ylabel('Power Monitors [au]')
